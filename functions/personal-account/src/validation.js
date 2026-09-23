@@ -19,6 +19,7 @@ const clearedWithNull = 'Send null to clear this field, not an empty string.'
 
 export const updateRequest = z
   .object({
+    userId: z.string().min(1),
     firstName: z.string().trim().min(1, clearedWithNull).max(100).optional(),
     lastName: z.string().trim().min(1, clearedWithNull).max(100).optional(),
     contactEmail: z
@@ -34,6 +35,6 @@ export const updateRequest = z
       .nullable()
       .optional(),
   })
-  .refine((fields) => Object.keys(fields).length > 0, {
+  .refine((fields) => Object.keys(fields).some((field) => field !== 'userId'), {
     message: 'Provide at least one field to update.',
   })

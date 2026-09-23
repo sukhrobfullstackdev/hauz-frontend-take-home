@@ -7,7 +7,7 @@
 
 import { ID, Query } from 'node-appwrite'
 
-import { conflict, invalidRequest, notFound } from './errors.js'
+import { conflict, invalidRequest, notFound, unauthorized } from './errors.js'
 import { createRequest, updateRequest } from './validation.js'
 
 const DATABASE_ID = 'main'
@@ -127,6 +127,9 @@ export async function createPersonalAccount(deps, userId, body, res) {
  */
 export async function updatePersonalAccount(deps, userId, body, res) {
   const fields = parse(updateRequest, body)
+  if (fields.userId !== userId) {
+    throw unauthorized()
+  }
   const profile = await requireProfile(deps, userId)
 
   const columns = {
@@ -137,7 +140,9 @@ export async function updatePersonalAccount(deps, userId, body, res) {
   }
 
   const data = Object.fromEntries(
-    Object.entries(fields).map(([field, value]) => [columns[field], value]),
+    Object.entries(fields)
+      .filter(([field]) => field !== 'userId')
+      .map(([field, value]) => [columns[field], value]),
   )
 
   const updated = await deps.tables.updateRow({

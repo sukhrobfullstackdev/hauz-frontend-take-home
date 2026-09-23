@@ -25,8 +25,9 @@ In the Appwrite Console, create a new project. From **Overview**, copy the
 **Project ID** and the **API Endpoint**. The endpoint is region specific, for
 example `https://fra.cloud.appwrite.io/v1`.
 
-Put both into `appwrite.config.json`, replacing `REPLACE_WITH_YOUR_PROJECT_ID`
-and the `endpoint` if your region differs.
+The repository is configured for the project ID in your local environment. If
+you use another Appwrite project, replace `projectId` in `appwrite.config.json`
+and `APPWRITE_PROJECT_ID` in your environment with the same value.
 
 ### 3. Push the database, table and Function
 
@@ -67,8 +68,16 @@ Copy the secret once. You cannot read it again.
 cp .env.example .env
 ```
 
+On Windows PowerShell, the equivalent is:
+
+```powershell
+Copy-Item .env.example .env
+```
+
 Fill in `APPWRITE_ENDPOINT`, `APPWRITE_PROJECT_ID` and `APPWRITE_API_KEY`.
 `.env` is git-ignored. Do not commit it.
+The API key must have `sessions.write`, `users.read`, `users.write`, and
+`execution.write` scopes. Restart `npm run dev` after changing `.env`.
 
 ### 6. Run it
 
@@ -78,13 +87,28 @@ npm run dev
 
 http://localhost:3000
 
+The browser flow is email code sign-in, onboarding for new users, and profile
+editing at `/profile`. Appwrite credentials and the Appwrite session secret are
+used only by TanStack Start server functions. The browser receives an HttpOnly
+session cookie and never receives an API key or session secret.
+
+Verify the implementation with:
+
+```bash
+npm run typecheck
+npm run build
+```
+
 ## What is in here
 
 ```
-src/                          the app you are building; it is empty on purpose
+src/                          the app
   router.tsx                  router setup
-  routes/__root.tsx           the document shell
-  routes/index.tsx            placeholder home page
+  routes/__root.tsx           SSR auth state and site header
+  routes/sign-in.tsx           email code sign-in
+  routes/onboarding.tsx        first-time profile creation
+  routes/profile.tsx           profile view and edit
+  server/auth.ts               server-only Appwrite adapter
 functions/personal-account/   the Function, already written
 appwrite.config.json          database, table and Function definitions
 ```
@@ -103,11 +127,11 @@ One Appwrite Function with three routes. It is deployed with **Execute access:
 users**, which means a signed-in Appwrite user can execute it and a guest
 cannot.
 
-| Route | Body | Result |
-|---|---|---|
-| `GET /personal-account` | | `200` with the account, `404` if the caller has none |
-| `POST /personal-account` | `firstName`, `lastName`, `role` | `201` created, `200` if it already exists, `409` if it exists with a different role |
-| `PATCH /personal-account` | any of `firstName`, `lastName`, `contactEmail`, `bio` | `200` with the updated account |
+| Route                     | Body                                                               | Result                                                                              |
+| ------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `GET /personal-account`   |                                                                    | `200` with the account, `404` if the caller has none                                |
+| `POST /personal-account`  | `firstName`, `lastName`, `role`                                    | `201` created, `200` if it already exists, `409` if it exists with a different role |
+| `PATCH /personal-account` | `userId` and any of `firstName`, `lastName`, `contactEmail`, `bio` | `200` with the updated account                                                      |
 
 `role` is either `property_owner` or `realtor`.
 
@@ -117,6 +141,10 @@ Every route answers `401` when the execution has no signed-in Appwrite user.
 Errors come back as `{ "error": "<code>", "message": "...", "issues": [...] }`.
 Codes you may see: `unauthorized`, `not_found`, `invalid_request`,
 `personal_account_inconsistent`, `internal_error`.
+
+The web server includes the signed-in user's ID in PATCH requests because the
+product flow requires it. The Function compares that value with Appwrite's
+trusted `x-appwrite-user-id` header; the header remains authoritative.
 
 You can read the source under `functions/personal-account/src/`. You may change
 it if you need to, but say why in `NOTES.md`.
